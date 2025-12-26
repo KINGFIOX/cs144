@@ -6,6 +6,8 @@
 
 #include <memory>
 #include <queue>
+#include <unordered_map>
+#include <vector>
 
 // A "network interface" that connects IP (the internet layer, or network layer)
 // with Ethernet (the network access layer, or link layer).
@@ -49,7 +51,7 @@ public:
   // Sends an Internet datagram, encapsulated in an Ethernet frame (if it knows the Ethernet destination
   // address). Will need to use [ARP](\ref rfc::rfc826) to look up the Ethernet destination address for the next
   // hop. Sending is accomplished by calling `transmit()` (a member variable) on the frame.
-  void send_datagram( InternetDatagram dgram, const Address& next_hop );
+  void send_datagram( const InternetDatagram& dgram, const Address& next_hop );
 
   // Receives an Ethernet frame and responds appropriately.
   // If type is IPv4, pushes the datagram to the datagrams_in queue.
@@ -82,4 +84,20 @@ private:
 
   // Datagrams that have been received
   std::queue<InternetDatagram> datagrams_received_ {};
+
+  // <IP, ARP Cache Entry>
+  struct ARPCacheEntry
+  {
+    EthernetAddress ethernet_address;
+    size_t time_ms; // 进入列表时的时间戳
+  };
+
+  size_t time_ms_ { 0 }; // 时间戳
+  std::unordered_map<uint32_t, ARPCacheEntry> arp_cache_ {};
+
+  // 防止出现 ARP 请求风暴，短时间内不会重复请求同一个 ARP
+  std::unordered_map<uint32_t, size_t> arp_request_time_ {};
+
+  // <IP, 等待发送的 datagram 列表>
+  std::unordered_map<uint32_t, std::vector<InternetDatagram>> waiting_dgrams_ {};
 };
