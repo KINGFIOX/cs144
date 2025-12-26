@@ -14,7 +14,7 @@ public:
   explicit Wrap32( uint32_t raw_value ) : raw_value_( raw_value ) {}
 
   /* Construct a Wrap32 given an absolute sequence number n and the zero point. */
-  static Wrap32 wrap( uint64_t n, Wrap32 zero_point );
+  static Wrap32 wrap( uint64_t n, Wrap32 zero_point /*initial value*/ );
 
   /*
    * The unwrap method returns an absolute sequence number that wraps to this Wrap32, given the zero point
