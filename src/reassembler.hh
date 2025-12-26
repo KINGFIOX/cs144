@@ -2,6 +2,11 @@
 
 #include "byte_stream.hh"
 
+#include <cstdint>
+#include <list>
+#include <optional>
+#include <sys/types.h>
+
 class Reassembler
 {
 public:
@@ -43,4 +48,19 @@ public:
 
 private:
   ByteStream output_;
+
+  struct Segment
+  {
+    /// members
+    uint64_t start {};
+    std::string data {};
+
+    /// member functions
+    uint64_t end() const { return start + data.size(); }
+    void merge( const Segment& other );
+  };
+
+  uint64_t next_index() const { return output_.writer().bytes_pushed(); } // 下一个应输出的字节下标，从0开始
+  std::list<Segment> segments_ {};
+  std::optional<uint64_t> eof_index_ {}; // 若已知流结尾，则保存结尾下标（开区间）
 };
