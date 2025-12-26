@@ -1,5 +1,4 @@
 #include "router.hh"
-#include "debug.hh"
 
 #include <iostream>
 
@@ -20,11 +19,57 @@ void Router::add_route( const uint32_t route_prefix,
        << static_cast<int>( prefix_length ) << " => " << ( next_hop.has_value() ? next_hop->ip() : "(direct)" )
        << " on interface " << interface_num << "\n";
 
-  debug( "unimplemented add_route() called" );
+  if (prefix_length > 32) { // ignore invalid routes
+    return;
+  }
+
+  // 按前缀长度从大到小插入，保持路由表有序（最长前缀优先）
+  auto it = route_table_.begin();
+  while ( it != route_table_.end() && it->prefix_length > prefix_length ) {
+    ++it;
+  }
+  route_table_.insert( it, { route_prefix, prefix_length, next_hop, interface_num } );
 }
 
 // Go through all the interfaces, and route every incoming datagram to its proper outgoing interface.
 void Router::route()
 {
-  debug( "unimplemented route() called" );
+  // 遍历每个接口，转发其收到的所有报文
+  for ( const auto& iface : interfaces_ ) {
+    auto& queue = iface->datagrams_received();
+
+    while ( !queue.empty() ) {
+      InternetDatagram dgram = std::move( queue.front() );
+      queue.pop();
+
+      // TTL<=1 无法继续转发，直接丢弃
+      if ( dgram.header.ttl <= 1 ) {
+        continue;
+      }
+
+      // 最长前缀匹配
+      optional<RouteEntry> best_route {};
+      for ( const auto& route : route_table_ ) { // 最长前缀匹配
+        const uint32_t mask = route.prefix_length == 0 ? 0 : 0xffffffffu << ( 32 - route.prefix_length );
+        if ( ( dgram.header.dst & mask ) == ( route.prefix & mask ) ) {
+          best_route = route;
+          break;
+        }
+      }
+
+      if ( !best_route.has_value() ) { // not found
+        continue;
+      }
+
+      // update TTL and checksum
+      dgram.header.ttl -= 1;
+      dgram.header.compute_checksum();
+
+      const Address next_hop = best_route->next_hop.has_value()
+                                 ? best_route->next_hop.value()                    // 下一条
+                                 : Address::from_ipv4_numeric( dgram.header.dst ); // 直连
+
+      interfaces_.at( best_route->interface_num )->send_datagram( dgram, next_hop );
+    }
+  }
 }

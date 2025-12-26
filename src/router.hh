@@ -3,6 +3,7 @@
 #include "exception.hh"
 #include "network_interface.hh"
 
+#include <list>
 #include <optional>
 
 // \brief A router that has multiple network interfaces and
@@ -34,4 +35,16 @@ public:
 private:
   // The router's collection of network interfaces
   std::vector<std::shared_ptr<NetworkInterface>> interfaces_ {};
+
+  // Routing table entry
+  struct RouteEntry
+  {
+    uint32_t prefix;                 // 路由前缀
+    uint8_t prefix_length;           // 前缀长度
+    std::optional<Address> next_hop; // 下一跳（为空表示直连）
+    size_t interface_num;            // 出口接口(interfaces_的下标)
+  };
+
+  // 路由表
+  std::list<RouteEntry> route_table_ {};
 };
